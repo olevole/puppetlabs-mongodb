@@ -1,43 +1,77 @@
 require 'spec_helper'
 
-describe 'mongodb::repo', :type => :class do
+describe 'mongodb::repo' do
+  on_supported_os.each do |os, facts|
+    context "on #{os}" do
+      let :facts do
+        facts
+      end
 
-  context 'when deploying on Debian' do
-    with_debian_facts
+      describe 'without parameters' do
+        it { is_expected.to raise_error(Puppet::Error, %r{unsupported}) }
+      end
 
-    it {
-      is_expected.to contain_class('mongodb::repo::apt')
-    }
-  end
+      describe 'with version set' do
+        let :params do
+          {
+            version: '3.6.1'
+          }
+        end
 
-  context 'when deploying on CentOS' do
-    with_centos_facts
+        case facts[:osfamily]
+        when 'RedHat'
+          it { is_expected.to contain_class('mongodb::repo::yum') }
+          it do
+            is_expected.to contain_yumrepo('mongodb').
+              with_baseurl('https://repo.mongodb.org/yum/redhat/$releasever/mongodb-org/3.6/$basearch/')
+          end
+        when 'Debian'
+          it { is_expected.to contain_class('mongodb::repo::apt') }
+          case facts[:operatingsystem]
+          when 'Debian'
+            it do
+              is_expected.to contain_apt__source('mongodb').
+                with_location('https://repo.mongodb.org/apt/debian').
+                with_release("#{facts[:lsbdistcodename]}/mongodb-org/3.6")
+            end
+          when 'Ubuntu'
+            it do
+              is_expected.to contain_apt__source('mongodb').
+                with_location('https://repo.mongodb.org/apt/ubuntu').
+                with_release("#{facts[:lsbdistcodename]}/mongodb-org/3.6")
+            end
+          end
+        else
+          it { is_expected.to raise_error(Puppet::Error, %r{not supported}) }
+        end
+      end
 
-    it {
-      is_expected.to contain_class('mongodb::repo::yum')
-    }
-  end
+      describe 'with proxy' do
+        let :params do
+          {
+            version: '3.6.1',
+            proxy: 'http://proxy-server:8080',
+            proxy_username: 'proxyuser1',
+            proxy_password: 'proxypassword1'
+          }
+        end
 
-  context 'when yumrepo has a proxy set' do
-    with_redhat_facts
-
-    let :params do
-      {
-        :proxy => 'http://proxy-server:8080',
-        :proxy_username => 'proxyuser1',
-        :proxy_password => 'proxypassword1',
-      }
-    end
-    it {
-      is_expected.to contain_class('mongodb::repo::yum')
-    }
-    it do
-      should contain_yumrepo('mongodb').with({
-        'enabled' => '1',
-        'proxy' => 'http://proxy-server:8080',
-        'proxy_username' => 'proxyuser1',
-        'proxy_password' => 'proxypassword1',
-        })
+        case facts[:osfamily]
+        when 'RedHat'
+          it { is_expected.to contain_class('mongodb::repo::yum') }
+          it do
+            is_expected.to contain_yumrepo('mongodb').
+              with_enabled('1').
+              with_proxy('http://proxy-server:8080').
+              with_proxy_username('proxyuser1').
+              with_proxy_password('proxypassword1')
+          end
+        when 'Debian'
+          it { is_expected.to contain_class('mongodb::repo::apt') }
+        else
+          it { is_expected.to raise_error(Puppet::Error, %r{not supported}) }
+        end
+      end
     end
   end
 end

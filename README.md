@@ -1,6 +1,12 @@
 # mongodb puppet module
 
-[![Build Status](https://travis-ci.org/puppetlabs/puppetlabs-mongodb.png?branch=master)](https://travis-ci.org/puppetlabs/puppetlabs-mongodb)
+[![License](https://img.shields.io/github/license/voxpupuli/puppet-mongodb.svg)](https://github.com/voxpupuli/puppet-mongodb/blob/master/LICENSE)
+[![Build Status](https://travis-ci.org/voxpupuli/puppet-mongodb.svg?branch=master)](https://travis-ci.org/voxpupuli/puppet-mongodb)
+[![Code Coverage](https://coveralls.io/repos/github/voxpupuli/puppet-mongodb/badge.svg?branch=master)](https://coveralls.io/github/voxpupuli/puppet-mongodb)
+[![Puppet Forge](https://img.shields.io/puppetforge/v/puppet/mongodb.svg)](https://forge.puppetlabs.com/puppet/mongodb)
+[![Puppet Forge - downloads](https://img.shields.io/puppetforge/dt/puppet/mongodb.svg)](https://forge.puppetlabs.com/puppet/mongodb)
+[![Puppet Forge - endorsement](https://img.shields.io/puppetforge/e/puppet/mongodb.svg)](https://forge.puppetlabs.com/puppet/mongodb)
+[![Puppet Forge - scores](https://img.shields.io/puppetforge/f/puppet/mongodb.svg)](https://forge.puppetlabs.com/puppet/mongodb)
 
 #### Table of Contents
 
@@ -15,16 +21,7 @@
 ## Overview
 
 Installs MongoDB on RHEL/Ubuntu/Debian from OS repo, or alternatively from
-10gen repository [installation documentation](http://www.mongodb.org/display/DOCS/Ubuntu+and+Debian+packages).
-
-### Deprecation Warning ###
-
-This module is still in beta which means the API is subject to change in
-backwards incompatible ways. If your project depends on an old API, please pin
-your dependencies to the necessary version to ensure your environments don't break.
-
-The current module design is undergoing review for potential 1.0 release. We welcome
-any feedback with regard to the APIs and patterns used in this release.
+MongoDB community/enterprise repositories.
 
 ## Module Description
 
@@ -32,10 +29,7 @@ The MongoDB module manages mongod server installation and configuration of the
 mongod daemon. For the time being it supports only a single MongoDB server
 instance, without sharding functionality.
 
-For the 0.5 release, the MongoDB module now supports database and user types.
-
-For the 0.6 release, the MongoDB module now supports basic replicaset features
-(initiating a replicaset and adding members, but without specific options).
+The MongoDB module also manages Ops Manager setup and the mongdb-mms daemon.
 
 ## Setup
 
@@ -46,16 +40,18 @@ For the 0.6 release, the MongoDB module now supports basic replicaset features
 * MongoDB service.
 * MongoDB client.
 * MongoDB sharding support (mongos)
-* 10gen/mongodb apt/yum repository.
+* MongoDB apt/yum repository.
+* Ops Manager package.
+* Ops Manager configuration files.
 
 ### Beginning with MongoDB
 
 If you just want a server installation with the default options you can run
-`include '::mongodb::server'`. If you need to customize configuration
+`include mongodb::server`. If you need to customize configuration
 options you need to do the following:
 
 ```puppet
-class {'::mongodb::server':
+class {'mongodb::server':
   port    => 27018,
   verbose => true,
 }
@@ -64,7 +60,7 @@ class {'::mongodb::server':
 For Red Hat family systems, the client can be installed in a similar fashion:
 
 ```puppet
-class {'::mongodb::client':}
+class {'mongodb::client':}
 ```
 
 Note that for Debian/Ubuntu family systems the client is installed with the
@@ -74,35 +70,34 @@ If one plans to configure sharding for a Mongo deployment, the module offer
 the `mongos` installation. `mongos` can be installed the following way :
 
 ```puppet
-class {'::mongodb::mongos' :
+class {'mongodb::mongos' :
   configdb => ['configsvr1.example.com:27018'],
 }
 ```
 
-Although most distros come with a prepacked MongoDB server we recommend to
-use the 10gen/MongoDB software repository, because most of the current OS
-packages are outdated and not appropriate for a production environment.
-To install MongoDB from 10gen repository:
+Although most distros come with a prepacked MongoDB server, you may prefer to
+use a more recent version. To install MongoDB from the community repository:
 
 ```puppet
-class {'::mongodb::globals':
+class {'mongodb::globals':
   manage_package_repo => true,
-}->
-class {'::mongodb::client': } ->
-class {'::mongodb::server': }
+  version             => '3.6',
+}
+-> class {'mongodb::client': }
+-> class {'mongodb::server': }
 ```
 
-If you don't want to use the 10gen/MongoDB software repository or the OS packages,
+If you don't want to use the MongoDB software repository or the OS packages,
 you can point the module to a custom one.
 To install MongoDB from a custom repository:
 
 ```puppet
-class {'::mongodb::globals':
+class {'mongodb::globals':
   manage_package_repo => true,
   repo_location => 'http://example.com/repo'
-}->
-class {'::mongodb::server': }->
-class {'::mongodb::client': }
+}
+-> class {'mongodb::server': }
+-> class {'mongodb::client': }
 ```
 
 Having a local copy of MongoDB repository (that is managed by your private modules)
@@ -110,12 +105,12 @@ you can still enjoy the charms of `mongodb::params` that manage packages.
 To disable managing of repository, but still enable managing packages:
 
 ```puppet
-class {'::mongodb::globals':
+class {'mongodb::globals':
   manage_package_repo => false,
   manage_package      => true,
-}->
-class {'::mongodb::server': }->
-class {'::mongodb::client': }
+}
+-> class {'mongodb::server': }
+-> class {'mongodb::client': }
 ```
 
 ## Usage
@@ -132,7 +127,7 @@ On its own it does nothing.
 To install MongoDB server, create database "testdb" and user "user1" with password "pass1".
 
 ```puppet
-class {'::mongodb::server':
+class {'mongodb::server':
   auth => true,
 }
 
@@ -144,6 +139,30 @@ mongodb::db { 'testdb':
 Parameter 'password_hash' is hex encoded md5 hash of "user1:mongo:pass1".
 Unsafe plain text password could be used with 'password' parameter instead of 'password_hash'.
 
+### Ops Manager
+
+To install Ops Manager and have it run with a local MongoDB application server do the following:
+
+```puppet
+class {'mongodb::opsmanager':
+  opsmanager_url        => 'http://opsmanager.yourdomain.com'
+  mongo_uri             => 'mongodb://yourmongocluster:27017,
+  from_email_addr       => 'opsmanager@yourdomain.com',
+  reply_to_email_addr   => 'replyto@yourdomain.com',
+  admin_email_addr      => 'admin@yourdomain.com',
+  $smtp_server_hostname => 'email-relay.yourdomain.com'
+}
+```
+
+The default settings will not set useful email addresses. You can also just run `include mongodb::opsmanager`
+and then set the emails later.
+
+## Ops Manager Usage
+
+Most of the interaction for the server is done via `mongodb::opsmanager`. For
+more options please have a look at [mongodb::opsmanager](#class-mongodbopsmanager).
+There are also some settings that can be configured in `mongodb::globals`.
+
 ## Reference
 
 ### Classes
@@ -153,11 +172,12 @@ Unsafe plain text password could be used with 'password' parameter instead of 'p
 * `mongodb::client`: Installs the MongoDB client shell (for Red Hat family systems)
 * `mongodb::globals`: Configure main settings in a global way
 * `mongodb::mongos`: Installs and configure Mongos server (for sharding support)
+* `mongodb::opsmanager`: Installs and configure Ops Manager
 
 #### Private classes
-* `mongodb::repo`: Manage 10gen/MongoDB software repository
-* `mongodb::repo::apt`: Manage Debian/Ubuntu apt 10gen/MongoDB repository
-* `mongodb::repo::yum`: Manage Redhat/CentOS apt 10gen/MongoDB repository
+* `mongodb::repo`: Manage MongoDB software repository
+* `mongodb::repo::apt`: Manage Debian/Ubuntu apt MongoDB repository
+* `mongodb::repo::yum`: Manage Redhat/CentOS yum MongoDB repository
 * `mongodb::server::config`: Configures MongoDB configuration files
 * `mongodb::server::install`: Install MongoDB software packages
 * `mongodb::server::service`: Manages service
@@ -165,6 +185,8 @@ Unsafe plain text password could be used with 'password' parameter instead of 'p
 * `mongodb::mongos::config`: Configures Mongos configuration files
 * `mongodb::mongos::install`: Install Mongos software packages
 * `mongodb::mongos::service`: Manages Mongos service
+* `mongodb::opsmanager::install` : Install Ops Manager software package
+* `mongodb::opsmanager::service` : Manages Ops Manager (mongodb-mms) service
 
 #### Class: mongodb::globals
 *Note:* most server specific defaults should be overridden in the `mongodb::server`
@@ -228,9 +250,9 @@ When `manage_package_repo` is set to true, this setting indicates if it will
 use the Community Edition (false, the default) or the Enterprise one (true).
 
 ##### `version`
-The version of MonogDB to install/manage. This is a simple way of providing
-a specific version such as '2.2' or '2.4' for example. If not specified,
-the module will use the default for your OS distro.
+The version of MonogDB to install/manage. This is needed when managing
+repositories. If not specified, the module will use the default for your OS
+distro.
 
 ##### `repo_location`
 This setting can be used to override the default MongoDB repository location.
@@ -262,6 +284,12 @@ for your OS distro.
 ##### `dbpath`
 Set this value to designate a directory for the mongod instance to store
 it's data. If not specified, the module will use the default for your OS distro.
+
+##### `dbpath_fix`
+Set this value to true if you want puppet to recursively manage the permissions
+of the files in the dbpath directory.  If you are using the default dbpath, this
+should probably be false. Set this to true if you are using a custom dbpath. The
+default is false.
 
 ##### `pidfilepath`
 Specify a file location to hold the PID or process ID of the mongod process.
@@ -343,7 +371,6 @@ Default: None
 ##### `objcheck`
 Forces the mongod to validate all requests from clients upon receipt to ensure
 that clients never insert invalid documents into the database.
-Default: on v2.4 default to true and on earlier version to false
 
 ##### `quota`
 Set to true to enable a maximum limit for the number of data files each database
@@ -429,10 +456,15 @@ Mutually exclusive with `replset_members` param.
 ```puppet
 class mongodb::server {
   replset        => 'rsmain',
-  replset_config => { 'rsmain' => { ensure  => present, members => ['host1:27017', 'host2:27017', 'host3:27017']  }  }
+  replset_config => { 'rsmain' => { ensure  => present, settings => { heartbeatTimeoutSecs => 15, getLastErrorModes => { ttmode => { dc => 1 } } }, members => [{'host'=>'host1:27017', 'tags':{ 'dc' : 'east'}}, { 'host' => 'host2:27017'}, 'host3:27017']  }  }
 
 }
 ```
+
+##### `config_data`
+A hash to allow for additional configuration options
+to be set in user-provided template.
+
 
 ##### `rest`
 Set to true to enable a simple REST interface. Default: false
@@ -501,6 +533,14 @@ Default: <>
 Set to true to disable mandatory SSL client authentication
 Default: False
 
+##### `ssl_invalid_hostnames`
+Set to true to disable fqdn SSL cert check
+Default: False
+
+##### `ssl_mode`
+Ssl authorization mode. Valid options are: requireSSL, preferSSL, allowSSL.
+Default: requireSSL
+
 ##### `service_manage`
 Whether or not the MongoDB service resource should be part of the catalog.
 Default: true
@@ -530,6 +570,10 @@ Administrator user roles
 ##### `store_creds`
 Store admin credentials in mongorc.js file. Uses with `create_admin` parameter
 
+##### `handle_creds`
+Set this to false to avoid having puppet handle .mongorc.js in case you wish to deliver it by other means.
+This is needed for facts to work if you have auth set to true.  Default is true.
+
 
 #### Class: mongodb::mongos
 class. This class should only be used if you want to implement sharding within
@@ -550,6 +594,9 @@ Config content if the default doesn't match one needs.
 
 ##### `config_template`
 Path to the config template if the default doesn't match one needs.
+
+##### `config_data`
+Hash containing key-value pairs to allow for additional configuration options to be set in user-provided template.
 
 ##### `configdb`
 Array of the config servers IP addresses the mongos should connect to.
@@ -607,6 +654,22 @@ Plain-text user password (will be hashed)
 ##### `roles`
 Array with user roles. Default: ['dbAdmin']
 
+##### `opsmanager_url`
+The fully qualified url where opsmanager runs. Must include the port. Ex:
+'http://opsmanager.yourdomain.com:8080'
+
+##### `opsmanager_mongo_uri`
+Full URI where the Ops Manager application mongodb server(s) can be found. Default: 'mongodb://127.0.0.1:27017'
+
+##### `ca_file`
+Ca file for secure connection to backup agents.
+
+##### `pem_key_file`
+Pem key file containing the cert and private key used for secure connections to backup agents.
+
+##### `pem_key_password`
+The password to the pem key file.
+
 ### Providers
 
 #### Provider: mongodb_database
@@ -644,7 +707,10 @@ mongodb_user { testuser:
 Name of the mongodb user.
 
 ##### `password_hash`
-Hex encoded md5 hash of "$username:mongo:$password".
+Hex encoded md5 hash of "$username:mongo:$password". Only available on MongoDB 3.0 and later.
+
+##### `password`
+Plaintext password of the user.
 
 ##### `database`
 Name of database. It will be created, if not exists.
@@ -709,7 +775,7 @@ This module has been tested on:
 * RHEL 5/6/7
 * CentOS 5/6/7
 
-For a full list of tested operating systems please have a look at the [.nodeset.xml](https://github.com/puppetlabs/puppetlabs-mongodb/blob/master/.nodeset.yml) definition.
+For a full list of tested operating systems please have a look at the [.nodeset.xml](https://github.com/voxpupuli/puppet-mongodb/blob/master/.nodeset.yml) definition.
 
 This module should support `service_ensure` separate from the `ensure` value on `Class[mongodb::server]` but it does not yet.
 
@@ -719,47 +785,18 @@ While this module supports both 1.x and 2.x versions of the puppetlabs-apt modul
 
 ## Development
 
-Puppet Labs modules on the Puppet Forge are open projects, and community
-contributions are essential for keeping them great. We can’t access the
-huge number of platforms and myriad of hardware, software, and deployment
-configurations that Puppet is intended to serve.
+This module is maintained by [Vox Pupuli](https://voxpupuli.org/). Voxpupuli
+welcomes new contributions to this module, especially those that include
+documentation and rspec tests. We are happy to provide guidance if necessary.
 
-We want to keep it as easy as possible to contribute changes so that our
-modules work in your environment. There are a few guidelines that we need
-contributors to follow so that we can have a chance of keeping on top of things.
-
-You can read the complete module contribution guide [on the Puppet Labs wiki.](http://projects.puppetlabs.com/projects/module-site/wiki/Module_contributing)
-
-### Testing
-
-There are two types of tests distributed with this module. Unit tests with
-rspec-puppet and system tests using rspec-system.
-
-
-unit tests should be run under Bundler with the gem versions as specified
-in the Gemfile. To install the necessary gems:
-
-    bundle install --path=vendor
-
-Test setup and teardown is handled with rake tasks, so the
-supported way of running tests is with
-
-    bundle exec rake spec
-
-
-For system test you will also need to install vagrant > 1.3.x and virtualbox > 4.2.10.
-To run the system tests
-
-    bundle exec rake spec:system
-
-To run the tests on different operating systems, see the sets available in [.nodeset.xml](https://github.com/puppetlabs/puppetlabs-mongodb/blob/master/.nodeset.yml)
-and run the specific set with the following syntax:
-
-    RSPEC_SET=ubuntu-server-12042-x64 bundle exec rake spec:system
+Please see [CONTRIBUTING](.github/CONTRIBUTING.md) for more details.
 
 ### Authors
 
+* Puppetlabs Module Team
+* Voxpupuli Team
+
 We would like to thank everyone who has contributed issues and pull requests to this module.
 A complete list of contributors can be found on the
-[GitHub Contributor Graph](https://github.com/puppetlabs/puppetlabs-mongodb/graphs/contributors)
-for the [puppetlabs-mongodb module](https://github.com/puppetlabs/puppetlabs-mongodb).
+[GitHub Contributor Graph](https://github.com/voxpupuli/puppet-mongodb/graphs/contributors)
+for the [puppet-mongodb module](https://github.com/voxpupuli/puppet-mongodb).

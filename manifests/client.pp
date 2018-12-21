@@ -2,17 +2,18 @@
 #
 # == Parameters
 #
-# [ensure] Desired ensure state of the package. Optional.
-#   Defaults to 'true'
+# $ensure:: Desired ensure state of the package.
 #
-# [package_name] Name of the package to install the client from. Default
-#   is repository dependent.
+# $package_name:: Name of the package to install the client from. Default is
+#                 repository dependent.
 #
 class mongodb::client (
-  $ensure       = $mongodb::params::package_ensure_client,
-  $package_name = $mongodb::params::client_package_name,
-) inherits mongodb::params {
-  anchor { '::mongodb::client::start': }
-  -> class { '::mongodb::client::install': }
-  -> anchor { '::mongodb::client::end': }
+  String[1] $ensure = $mongodb::client::params::package_ensure,
+  String[1] $package_name = $mongodb::client::params::package_name,
+) inherits mongodb::client::params {
+  package { 'mongodb_client':
+    ensure => $ensure,
+    name   => $package_name,
+    tag    => 'mongodb',
+  }
 }
